@@ -1,0 +1,62 @@
+name: Publish binary release
+
+on:
+  push:
+    tags:
+      - 'collector-v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Verify and publish assets
+    runs-on: windows-2025
+
+    steps:
+      - name: Checkout distribution tag
+        uses: actions/checkout@v5
+
+      - name: Verify release payload
+        id: manifest
+        shell: pwsh
+        run: |
+          $installer = Join-Path $env:GITHUB_WORKSPACE 'release\Pulseboard-Collector-Setup-x64.exe'
+          $checksumPath = "$installer.sha256"
+          $manifestPath = Join-Path $env:GITHUB_WORKSPACE 'release\release-manifest.json'
+          foreach ($path in @($installer, $checksumPath, $manifestPath)) {
+            if (-not (Test-Path -LiteralPath $path)) { throw "Falta el artefacto requerido: $path" }
+          }
+          $manifest = Get-Content -Raw -LiteralPath $manifestPath | ConvertFrom-Json
+          $actualHash = (Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($actualHash -ne $manifest.sha256) { throw 'El SHA-256 no coincide con release-manifest.json.' }
+          $checksumHash = ((Get-Content -Raw -LiteralPath $checksumPath) -split '\s+')[0].ToLowerInvariant()
+          if ($actualHash -ne $checksumHash) { throw 'El archivo .sha256 no coincide con el instalador.' }
+          "version=$($manifest.version)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "signature=$($manifest.signature)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+
+      - name: Publish public GitHub Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.manifest.outputs.version }}
+          SIGNATURE: ${{ steps.manifest.outputs.signature }}
+        run: |
+          $notes = @"
+          Instalador autocontenido de Pulseboard Collector para Windows x64.
+
+          - No requiere Node.js, PowerShell ni permisos de administrador.
+          - Se instala para el usuario actual y arranca automáticamente al iniciar sesión.
+          - Conserva `config.json` durante las actualizaciones.
+          - Estado de firma: $env:SIGNATURE.
+
+          Verifica la descarga con el archivo `.sha256` o `release-manifest.json` adjunto.
+          "@
+          gh release create $env:GITHUB_REF_NAME `
+            --target $env:GITHUB_SHA `
+            --title "Pulseboard Collector $env:VERSION" `
+            --notes $notes `
+            --latest `
+            release/Pulseboard-Collector-Setup-x64.exe `
+            release/Pulseboard-Collector-Setup-x64.exe.sha256 `
+            release/release-manifest.json
