@@ -21,7 +21,7 @@ jobs:
         id: manifest
         shell: pwsh
         run: |
-          $installer = Join-Path $env:GITHUB_WORKSPACE 'release\Pulseboard-Collector-Setup-x64.exe'
+          $installer = Join-Path $env:GITHUB_WORKSPACE 'release\TokGauge-Collector-Setup-x64.exe'
           $checksumPath = "$installer.sha256"
           $manifestPath = Join-Path $env:GITHUB_WORKSPACE 'release\release-manifest.json'
           foreach ($path in @($installer, $checksumPath, $manifestPath)) {
@@ -43,7 +43,7 @@ jobs:
           SIGNATURE: ${{ steps.manifest.outputs.signature }}
         run: |
           $notes = @"
-          Instalador autocontenido de Pulseboard Collector para Windows x64.
+          Instalador autocontenido de TokGauge Collector para Windows x64.
 
           - No requiere Node.js, PowerShell ni permisos de administrador.
           - Se instala para el usuario actual y arranca automáticamente al iniciar sesión.
@@ -54,9 +54,9 @@ jobs:
           "@
           gh release create $env:GITHUB_REF_NAME `
             --target $env:GITHUB_SHA `
-            --title "Pulseboard Collector $env:VERSION" `
+            --title "TokGauge Collector $env:VERSION" `
             --notes $notes `
             --latest `
-            release/Pulseboard-Collector-Setup-x64.exe `
-            release/Pulseboard-Collector-Setup-x64.exe.sha256 `
+            release/TokGauge-Collector-Setup-x64.exe `
+            release/TokGauge-Collector-Setup-x64.exe.sha256 `
             release/release-manifest.json
